@@ -1,5 +1,12 @@
 package caskdb
 
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+)
+
 // format file provides encode/decode functions for serialisation and deserialisation
 // operations
 //
@@ -72,17 +79,80 @@ func NewKeyEntry(timestamp uint32, position uint32, totalSize uint32) KeyEntry {
 }
 
 func encodeHeader(timestamp uint32, keySize uint32, valueSize uint32) []byte {
-	panic("implement me")
+	// allocate 12 bytes for header
+	header := make([]byte, headerSize)
+	// LittleEndian put uint32 4 bytes for timestamp
+	binary.LittleEndian.PutUint32(header[0:], timestamp)
+	// LittleEndian put uint32 4 bytes for keySize
+	binary.LittleEndian.PutUint32(header[4:], keySize)
+	// LittleEndian put uint32 4 bytes for valueSize
+	binary.LittleEndian.PutUint32(header[8:], valueSize)
+
+	return header
 }
 
 func decodeHeader(header []byte) (uint32, uint32, uint32) {
-	panic("implement me")
+	timestamp := binary.LittleEndian.Uint32(header[0:])
+	keySize := binary.LittleEndian.Uint32(header[4:])
+	valueSize := binary.LittleEndian.Uint32(header[8:])
+
+	return timestamp, keySize, valueSize
 }
 
 func encodeKV(timestamp uint32, key string, value string) (int, []byte) {
-	panic("implement me")
+	buf := new(bytes.Buffer)
+
+	err := binary.Write(buf, binary.LittleEndian, timestamp)
+	if err != nil {
+		fmt.Println("binary.Write failed for timestamp:", err)
+	}
+
+	err = binary.Write(buf, binary.LittleEndian, uint32(len(key)))
+	if err != nil {
+		fmt.Println("binary.Write failed for key:", err)
+	}
+	buf.WriteString(key)
+
+	err = binary.Write(buf, binary.LittleEndian, uint32(len(value)))
+	if err != nil {
+		fmt.Println("binary.Write failed for value:", err)
+	}
+	buf.WriteString(value)
+
+	return buf.Len(), buf.Bytes()
 }
 
 func decodeKV(data []byte) (uint32, string, string) {
-	panic("implement me")
+	buf := bytes.NewReader(data)
+
+	var timestamp uint32
+	var key_len uint32
+	var value_len uint32
+
+	err := binary.Read(buf, binary.LittleEndian, &timestamp)
+	if err != nil {
+		fmt.Println("binary.Read failed for timestamp:", err)
+	}
+
+	err = binary.Read(buf, binary.LittleEndian, &key_len)
+	if err != nil {
+		fmt.Println("binary.Read failed for key:", err)
+	}
+	keyBytes := make([]byte, key_len)
+	_, err = buf.Read(keyBytes)
+	if err != nil && err != io.EOF {
+		fmt.Println("reader.Read failed for key:", err)
+	}
+
+	err = binary.Read(buf, binary.LittleEndian, &value_len)
+	if err != nil {
+		fmt.Println("binary.Read failed for value:", err)
+	}
+	valueBytes := make([]byte, value_len)
+	_, err = buf.Read(valueBytes)
+	if err != nil && err != io.EOF {
+		fmt.Println("reader.Read failed for value:", err)
+	}
+
+	return timestamp, string(keyBytes), string(valueBytes)
 }
